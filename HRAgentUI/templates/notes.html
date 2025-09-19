@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Notes Summarizer</title>
+    <link rel="stylesheet" href="{% static 'css/notes.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>Candidate Notes Summarizer</h1>
+        <form id="notesForm" enctype="multipart/form-data">
+            <label for="candidateName">Candidate Name:</label>
+            <input type="text" id="candidateName" name="candidateName" required>
+            
+            <label for="notesFile">Please upload the candidate's notes (.txt):</label>
+            <input type="file" id="notesFile" name="notesFile" accept=".txt" required>
+            
+            <button type="submit">Summarize Notes</button>
+            <button type="button" id="addAnotherCandidate">Add Another Candidate</button>
+            <button type="button" id="clearAll">Clear All</button>
+        </form>
+        <div id="loadingMessage" class="hidden">Generating...</div>
+        <div id="result" class="hidden">
+            <h2>Summary</h2>
+            <textarea id="summaryText" readonly rows="10"></textarea>
+            <button type="button" id="downloadSummary">Download Summary</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('notesForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            document.getElementById('loadingMessage').classList.remove('hidden');
+            const formData = new FormData();
+            formData.append('candidateName', document.getElementById('candidateName').value);
+            formData.append('notesFile', document.getElementById('notesFile').files[0]);
+
+            fetch('{% url 'summarize_notes' %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('summaryText').value += '\n\n' + data.summary;
+                document.getElementById('result').classList.remove('hidden');
+                document.getElementById('loadingMessage').classList.add('hidden');
+                document.getElementById('loadingMessage').textContent = 'Generating...';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('loadingMessage').classList.add('hidden');
+                document.getElementById('loadingMessage').textContent = 'Generating...';
+            });
+        });
+
+        document.getElementById('addAnotherCandidate').addEventListener('click', function() {
+            document.getElementById('candidateName').value = '';
+            document.getElementById('notesFile').value = '';
+        });
+
+        document.getElementById('clearAll').addEventListener('click', function() {
+            document.getElementById('candidateName').value = '';
+            document.getElementById('notesFile').value = '';
+            document.getElementById('summaryText').value = '';
+            document.getElementById('result').classList.add('hidden');
+        });
+
+        document.getElementById('downloadSummary').addEventListener('click', function() {
+            const summaryText = document.getElementById('summaryText').value;
+            const blob = new Blob([summaryText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'summary.txt';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        });
+    </script>
+</body>
+</html>

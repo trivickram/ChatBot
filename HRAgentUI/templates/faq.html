@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company XYZ Chatbot</title>
+    <link rel="stylesheet" href="{% static 'css/faq.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to FAQ Chatbot</h1>
+        <p>I'm here to clarify any questions regarding our company's policies.</p>
+        <form id="chatbotForm" enctype="multipart/form-data" method="post">
+            {% csrf_token %}
+            <label for="question">Ask your question:</label>
+            <input type="text" id="question" name="question" required>
+            <label for="document">Upload company document (DOCX):</label>
+            <input type="file" id="document" name="document" accept=".docx">
+            <button type="submit">Submit</button>
+            <button type="button" id="clearButton">Clear</button>
+        </form>
+        <div id="result">
+            <textarea id="summaryText" readonly></textarea>
+        </div>
+        <p id="statusMessage"></p>
+    </div>
+    <script>
+        document.getElementById('chatbotForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const statusMessage = document.getElementById('statusMessage');
+            const summaryText = document.getElementById('summaryText');
+            
+            statusMessage.textContent = 'Generating...';
+
+            const formData = new FormData(this);
+            try {
+                const response = await fetch('/process_form/', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                summaryText.textContent = result.summary;
+                statusMessage.textContent = 'Done';
+            } catch (error) {
+                console.error('Error:', error);
+                statusMessage.textContent = 'An error occurred. Please try again.';
+            }
+        });
+
+        document.getElementById('clearButton').addEventListener('click', function() {
+            document.getElementById('question').value = '';
+            document.getElementById('document').value = '';
+            document.getElementById('summaryText').textContent = '';
+            document.getElementById('statusMessage').textContent = '';
+        });
+    </script>
+</body>
+</html>
