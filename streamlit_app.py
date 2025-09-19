@@ -8,6 +8,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Fix for sqlite3 compatibility issues with ChromaDB
+import sys
+try:
+    # Try to use pysqlite3 instead of sqlite3 for better compatibility
+    import pysqlite3
+    sys.modules['sqlite3'] = pysqlite3
+    print("✅ Using pysqlite3 for better ChromaDB compatibility")
+except ImportError:
+    print("⚠️ pysqlite3 not available, using system sqlite3")
+    pass
+
 import os
 import smtplib
 import ssl
@@ -33,6 +44,15 @@ except (ImportError, RuntimeError, Exception) as e:
     print(f"CrewAI initialization failed: {e}")
     # Store error for display in UI
     CREWAI_ERROR = str(e)
+
+# Import simple AI fallback
+try:
+    from simple_ai import create_simple_meeting_notes, create_simple_faq_answer, create_simple_email
+    SIMPLE_AI_AVAILABLE = True
+    print("✅ Simple AI fallback loaded successfully")
+except Exception as e:
+    SIMPLE_AI_AVAILABLE = False
+    print(f"⚠️ Simple AI fallback failed: {e}")
 
 # Custom CSS
 st.markdown("""
@@ -130,6 +150,14 @@ def create_hr_agents():
 def create_meeting_notes(user_input):
     """Generate meeting preparation notes"""
     if not CREWAI_AVAILABLE:
+        # Try simple AI first
+        if SIMPLE_AI_AVAILABLE:
+            try:
+                return create_simple_meeting_notes(user_input)
+            except Exception as e:
+                # Fall back to template if simple AI fails
+                pass
+        
         return f"""
 ## 📋 Meeting Notes - Fallback Mode
 
@@ -231,6 +259,14 @@ The Gemini AI service has reached its daily usage limit (50 requests per day for
 def answer_faq(question):
     """Answer FAQ questions using company policies"""
     if not CREWAI_AVAILABLE:
+        # Try simple AI first
+        if SIMPLE_AI_AVAILABLE:
+            try:
+                return create_simple_faq_answer(question)
+            except Exception as e:
+                # Fall back to template if simple AI fails
+                pass
+        
         return f"""
 ## ❓ HR Policy Response - Fallback Mode
 
@@ -313,6 +349,14 @@ For immediate assistance, you can:
 def generate_email(email_request):
     """Generate professional HR emails"""
     if not CREWAI_AVAILABLE:
+        # Try simple AI first
+        if SIMPLE_AI_AVAILABLE:
+            try:
+                return create_simple_email(email_request)
+            except Exception as e:
+                # Fall back to template if simple AI fails
+                pass
+        
         return f"""
 ## 📧 Professional HR Email - Fallback Mode
 
