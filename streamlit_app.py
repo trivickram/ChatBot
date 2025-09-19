@@ -26,14 +26,13 @@ try:
     from crewai import Crew, Agent, Task, Process
     from crewai_tools import DOCXSearchTool, CSVSearchTool, TXTSearchTool, SerperDevTool
     CREWAI_AVAILABLE = True
-except ImportError:
+except (ImportError, RuntimeError, Exception) as e:
     import sys, traceback
     CREWAI_AVAILABLE = False
     tb = traceback.format_exc()
-    st.error("CrewAI not installed. Please install with: pip install crewai crewai-tools")
-    # Diagnostic info to help the user identify which Python/paths Streamlit is using
-    st.markdown("**Diagnostic information (helpful for fixing environment issues):**")
-    st.code(f"Python executable: {sys.executable}\n\nsys.path:\n{chr(10).join(sys.path)}\n\nImportError traceback:\n{tb}")
+    print(f"CrewAI initialization failed: {e}")
+    # Store error for display in UI
+    CREWAI_ERROR = str(e)
 
 # Custom CSS
 st.markdown("""
@@ -131,7 +130,36 @@ def create_hr_agents():
 def create_meeting_notes(user_input):
     """Generate meeting preparation notes"""
     if not CREWAI_AVAILABLE:
-        return "CrewAI is not available. Please install required dependencies."
+        return f"""
+## 📋 Meeting Notes - Fallback Mode
+
+**Input:** {user_input}
+
+### Key Discussion Points:
+- Review candidate background and qualifications
+- Assess cultural fit and alignment with company values
+- Discuss role requirements and expectations
+- Evaluate technical competencies and experience
+
+### Questions to Ask:
+- Can you walk me through your experience with [relevant technology/skill]?
+- How do you handle challenging situations or conflicts?
+- What motivates you in your work?
+- Where do you see yourself in 5 years?
+
+### Action Items:
+- [ ] Review candidate resume and portfolio
+- [ ] Prepare technical assessment questions
+- [ ] Coordinate with team members for feedback
+- [ ] Schedule follow-up interview if appropriate
+
+### Policy References:
+- Employee Code of Conduct
+- Interview Guidelines and Best Practices
+- Equal Opportunity Employment Policies
+
+*Note: This is a simulated response. For AI-powered analysis, please resolve the system compatibility issues.*
+"""
     
     try:
         doc_search, csv_search, google_search = initialize_tools()
@@ -173,12 +201,58 @@ def create_meeting_notes(user_input):
         return str(result)
         
     except Exception as e:
-        return f"Error generating meeting notes: {str(e)}"
+        error_str = str(e)
+        if "quota" in error_str.lower() or "rate limit" in error_str.lower() or "429" in error_str:
+            return """
+## ⚠️ API Quota Exceeded
+
+The Gemini AI service has reached its daily usage limit (50 requests per day for free tier).
+
+### What happened?
+- You've successfully used the AI features 50 times today
+- Google's free tier has daily limits to prevent abuse
+- The quota resets every 24 hours
+
+### Options:
+1. **Wait**: The quota will reset tomorrow and you can continue using the AI features
+2. **Use Fallback Mode**: The app provides helpful templates and guidance without AI
+3. **Upgrade**: Consider upgrading to a paid Google AI plan for higher limits
+
+### Meanwhile:
+- All other app features still work normally
+- You can review your chat history
+- Basic HR templates and guidance are available
+
+*The AI features will be available again tomorrow when the quota resets.*
+"""
+        else:
+            return f"Error generating meeting notes: {error_str}"
 
 def answer_faq(question):
     """Answer FAQ questions using company policies"""
     if not CREWAI_AVAILABLE:
-        return "CrewAI is not available. Please install required dependencies."
+        return f"""
+## ❓ HR Policy Response - Fallback Mode
+
+**Your Question:** {question}
+
+### General HR Guidance:
+
+Based on common HR best practices, here are some general guidelines:
+
+**Common HR Topics:**
+- **Time Off:** Most companies have paid vacation, sick leave, and personal days. Check your employee handbook for specific policies.
+- **Benefits:** Typically include health insurance, retirement plans, and professional development opportunities.
+- **Code of Conduct:** Professional behavior, respect for colleagues, and adherence to company values are standard expectations.
+- **Performance Reviews:** Usually conducted annually or bi-annually to discuss goals, achievements, and development areas.
+
+### Next Steps:
+- Consult your Employee Handbook for company-specific policies
+- Contact your HR representative for detailed information
+- Review any recent policy updates or announcements
+
+*Note: This is general guidance only. For specific company policies and accurate information, please resolve the system compatibility issues to access AI-powered analysis of your company documents.*
+"""
     
     try:
         doc_search, _, google_search = initialize_tools()
@@ -219,12 +293,60 @@ def answer_faq(question):
         return str(result)
         
     except Exception as e:
-        return f"Error answering question: {str(e)}"
+        error_str = str(e)
+        if "quota" in error_str.lower() or "rate limit" in error_str.lower() or "429" in error_str:
+            return """
+## ⚠️ API Quota Exceeded
+
+The daily AI usage limit has been reached. Please try again tomorrow or use the fallback guidance above.
+
+For immediate assistance, you can:
+- Consult your Employee Handbook
+- Contact your HR representative directly
+- Use general HR best practices as guidance
+
+*AI-powered analysis will be available again when the quota resets.*
+"""
+        else:
+            return f"Error answering question: {error_str}"
 
 def generate_email(email_request):
     """Generate professional HR emails"""
     if not CREWAI_AVAILABLE:
-        return "CrewAI is not available. Please install required dependencies."
+        return f"""
+## 📧 Professional HR Email - Fallback Mode
+
+**Request:** {email_request}
+
+---
+
+**Subject:** Professional HR Communication
+
+**Email Draft:**
+
+Dear [Recipient Name],
+
+I hope this email finds you well. I am writing regarding {email_request.lower()}.
+
+[This is where the main content would be customized based on your specific request. Common HR email elements include:]
+
+- Clear and professional tone
+- Specific details and next steps
+- Contact information for follow-up
+- Relevant company policies or procedures
+
+Please don't hesitate to reach out if you have any questions or need further clarification.
+
+Best regards,
+[Your Name]
+[Your Title]
+[Company Name]
+[Contact Information]
+
+---
+
+*Note: This is a template response. For AI-generated, context-aware emails tailored to your specific needs, please resolve the system compatibility issues.*
+"""
     
     try:
         doc_search, csv_search, google_search = initialize_tools()
@@ -264,7 +386,19 @@ def generate_email(email_request):
         return str(result)
         
     except Exception as e:
-        return f"Error generating email: {str(e)}"
+        error_str = str(e)
+        if "quota" in error_str.lower() or "rate limit" in error_str.lower() or "429" in error_str:
+            return """
+## ⚠️ API Quota Exceeded
+
+The daily AI usage limit has been reached. Please try again tomorrow or use the email template above.
+
+The template provides a professional starting point that you can customize for your specific needs.
+
+*AI-powered email generation will be available again when the quota resets.*
+"""
+        else:
+            return f"Error generating email: {error_str}"
 
 def send_email(recipient, subject, body):
     """Send email using configured SMTP"""
@@ -297,6 +431,23 @@ def send_email(recipient, subject, body):
 def main():
     # Header
     st.markdown('<h1 class="main-header">🤖 EmpowerHR - AI-Powered HR Assistant</h1>', unsafe_allow_html=True)
+    
+    # Display CrewAI status
+    if not CREWAI_AVAILABLE:
+        st.warning("⚠️ AI features are currently limited due to a system compatibility issue.")
+        with st.expander("Technical Details"):
+            st.error("CrewAI initialization failed due to ChromaDB compatibility issues on this platform.")
+            st.info("**Fallback mode active:** Basic functionality is available with simulated responses.")
+            if 'CREWAI_ERROR' in globals():
+                st.code(f"Error: {CREWAI_ERROR}")
+    else:
+        # Add quota status info
+        st.info("ℹ️ **AI Status:** Powered by Google Gemini (Free tier: 50 requests/day)")
+        
+    # Add general quota warning in sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📊 Usage Info")
+    st.sidebar.info("Free tier: 50 AI requests per day\n\nIf quota is exceeded, fallback templates will be provided.")
     
     # Sidebar for navigation
     st.sidebar.title("🚀 HR Tools")
