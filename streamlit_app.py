@@ -478,10 +478,12 @@ def main():
     
     # Display CrewAI status
     if not CREWAI_AVAILABLE:
-        st.warning("⚠️ AI features are currently limited due to a system compatibility issue.")
-        with st.expander("Technical Details"):
-            st.error("CrewAI initialization failed due to ChromaDB compatibility issues on this platform.")
-            st.info("**Fallback mode active:** Basic functionality is available with simulated responses.")
+        if SIMPLE_AI_AVAILABLE:
+            st.success("🚀 **AI Status:** Powered by Google Gemini (Simple AI Mode)")
+            st.info("ℹ️ Using direct Gemini integration - ChromaDB features disabled but full AI functionality available!")
+        else:
+            st.warning("⚠️ AI features are currently limited due to a system compatibility issue.")
+       
             if 'CREWAI_ERROR' in globals():
                 st.code(f"Error: {CREWAI_ERROR}")
     else:
@@ -490,8 +492,16 @@ def main():
         
     # Add general quota warning in sidebar
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📊 Usage Info")
-    st.sidebar.info("Free tier: 50 AI requests per day\n\nIf quota is exceeded, fallback templates will be provided.")
+    st.sidebar.markdown("### 📊 AI Status")
+    if CREWAI_AVAILABLE:
+        st.sidebar.success("🚀 CrewAI + Gemini")
+        st.sidebar.info("Full features available\n50 requests/day (free tier)")
+    elif SIMPLE_AI_AVAILABLE:
+        st.sidebar.success("🚀 Simple AI + Gemini")
+        st.sidebar.info("Direct Gemini integration\n50 requests/day (free tier)")
+    else:
+        st.sidebar.warning("⚠️ Template Mode")
+        st.sidebar.info("AI unavailable\nTemplate responses only")
     
     # Sidebar for navigation
     st.sidebar.title("🚀 HR Tools")
