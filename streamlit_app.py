@@ -24,11 +24,16 @@ load_dotenv()
 # Import CrewAI components
 try:
     from crewai import Crew, Agent, Task, Process
-    from crewai_tools import DOCXSearchTool, CSVSearchTool, TXTSearchTool, tool, SerperDevTool
+    from crewai_tools import DOCXSearchTool, CSVSearchTool, TXTSearchTool, SerperDevTool
     CREWAI_AVAILABLE = True
 except ImportError:
+    import sys, traceback
     CREWAI_AVAILABLE = False
+    tb = traceback.format_exc()
     st.error("CrewAI not installed. Please install with: pip install crewai crewai-tools")
+    # Diagnostic info to help the user identify which Python/paths Streamlit is using
+    st.markdown("**Diagnostic information (helpful for fixing environment issues):**")
+    st.code(f"Python executable: {sys.executable}\n\nsys.path:\n{chr(10).join(sys.path)}\n\nImportError traceback:\n{tb}")
 
 # Custom CSS
 st.markdown("""
@@ -151,6 +156,7 @@ def create_meeting_notes(user_input):
             - Questions to ask
             - Action items
             """,
+            expected_output="A comprehensive set of meeting notes including key discussion points, relevant policies, questions to ask, and action items formatted in a clear, structured manner.",
             agent=meeting_agent,
             tools=[doc_search, csv_search, google_search]
         )
@@ -196,6 +202,7 @@ def answer_faq(question):
             - Relevant policy references if available
             - Any additional helpful context
             """,
+            expected_output="A clear, professional answer to the HR question including direct response, relevant policy references, and any additional helpful context.",
             agent=faq_agent,
             tools=[doc_search, google_search]
         )
@@ -240,6 +247,7 @@ def generate_email(email_request):
             
             Make sure the email follows professional HR communication standards.
             """,
+            expected_output="A complete professional HR email with subject line, greeting, body content, and closing that follows HR communication standards.",
             agent=email_agent,
             tools=[doc_search, csv_search, google_search] if doc_search else []
         )
