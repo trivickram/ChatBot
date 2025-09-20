@@ -45,19 +45,33 @@ def check_llm_config():
     )
     return False, user_msg, detected
 
-# Import CrewAI components
+# Import CrewAI components with comprehensive error handling
 try:
     from crewai import Crew, Agent, Task, Process
     from crewai_tools import DOCXSearchTool, CSVSearchTool, TXTSearchTool, SerperDevTool
     CREWAI_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     import sys, traceback
     CREWAI_AVAILABLE = False
     tb = traceback.format_exc()
-    st.error("CrewAI not installed. Please install with: pip install crewai crewai-tools")
+    
+    # Check for specific missing dependencies
+    if "onnxruntime" in str(e):
+        st.error("⚠️ **Missing Dependency**: onnxruntime is required for ChromaDB. Installing now...")
+        st.info("Please wait while we install the missing package and restart the app.")
+    else:
+        st.error("CrewAI not installed. Please install with: pip install crewai crewai-tools")
+    
     # Diagnostic info to help the user identify which Python/paths Streamlit is using
     st.markdown("**Diagnostic information (helpful for fixing environment issues):**")
     st.code(f"Python executable: {sys.executable}\n\nsys.path:\n{chr(10).join(sys.path)}\n\nImportError traceback:\n{tb}")
+except Exception as e:
+    import sys, traceback
+    CREWAI_AVAILABLE = False
+    tb = traceback.format_exc()
+    st.error(f"⚠️ **Unexpected Error**: {str(e)}")
+    st.markdown("**Full error details:**")
+    st.code(f"Python executable: {sys.executable}\n\nUnexpected error traceback:\n{tb}")
 
 # Custom CSS
 st.markdown("""
