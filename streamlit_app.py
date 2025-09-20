@@ -8,17 +8,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Fix for sqlite3 compatibility issues with ChromaDB
-import sys
-try:
-    # Try to use pysqlite3 instead of sqlite3 for better compatibility
-    import pysqlite3
-    sys.modules['sqlite3'] = pysqlite3
-    print("✅ Using pysqlite3 for better ChromaDB compatibility")
-except ImportError:
-    print("⚠️ pysqlite3 not available, using system sqlite3")
-    pass
-
 import os
 import smtplib
 import ssl
@@ -32,27 +21,43 @@ import json
 # Load environment variables
 load_dotenv()
 
+# Helper: check LLM configuration (OpenAI or Google Gemini)
+def check_llm_config():
+    """Return (ok: bool, message: str, detected_keys: dict) about LLM API key configuration."""
+    detected = {
+        'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY'),
+        'GEMINI_API_KEY': os.getenv('GEMINI_API_KEY'),
+        'GOOGLE_API_KEY': os.getenv('GOOGLE_API_KEY')
+    }
+
+    if detected['OPENAI_API_KEY']:
+        return True, "OpenAI key detected.", detected
+    # If using Gemini, one of GEMINI_API_KEY or GOOGLE_API_KEY might be set
+    if detected['GEMINI_API_KEY'] or detected['GOOGLE_API_KEY']:
+        return True, "Google Gemini key detected.", detected
+
+    # Nothing found
+    user_msg = (
+        "No LLM API keys were found.\n\n"
+        "If you want to use OpenAI (GPT), set the environment variable `OPENAI_API_KEY`.\n"
+        "If you want to use Google Gemini, set `GEMINI_API_KEY` or the provider-specific key and ensure crewai/litellm is configured for Google.\n\n"
+        "After setting the key, restart this Streamlit app."
+    )
+    return False, user_msg, detected
+
 # Import CrewAI components
 try:
     from crewai import Crew, Agent, Task, Process
     from crewai_tools import DOCXSearchTool, CSVSearchTool, TXTSearchTool, SerperDevTool
     CREWAI_AVAILABLE = True
-except (ImportError, RuntimeError, Exception) as e:
+except ImportError:
     import sys, traceback
     CREWAI_AVAILABLE = False
     tb = traceback.format_exc()
-    print(f"CrewAI initialization failed: {e}")
-    # Store error for display in UI
-    CREWAI_ERROR = str(e)
-
-# Import simple AI fallback
-try:
-    from simple_ai import create_simple_meeting_notes, create_simple_faq_answer, create_simple_email
-    SIMPLE_AI_AVAILABLE = True
-    print("✅ Simple AI fallback loaded successfully")
-except Exception as e:
-    SIMPLE_AI_AVAILABLE = False
-    print(f"⚠️ Simple AI fallback failed: {e}")
+    st.error("CrewAI not installed. Please install with: pip install crewai crewai-tools")
+    # Diagnostic info to help the user identify which Python/paths Streamlit is using
+    st.markdown("**Diagnostic information (helpful for fixing environment issues):**")
+    st.code(f"Python executable: {sys.executable}\n\nsys.path:\n{chr(10).join(sys.path)}\n\nImportError traceback:\n{tb}")
 
 # Custom CSS
 st.markdown("""
@@ -92,14 +97,32 @@ if 'chat_history' not in st.session_state:
 def initialize_tools():
     """Initialize search tools for documents and data"""
     try:
-        # Document search tool
-        doc_search = DOCXSearchTool("docs/Employee-Code-of-Conduct.docx")
+        # Document search tool with error handling
+        doc_search = None
+        try:
+            doc_search = DOCXSearchTool("docs/Employee-Code-of-Conduct.docx")
+            print("✅ DOCX tool initialized successfully")
+        except Exception as e:
+            print(f"⚠️ DOCX tool failed: {e}")
+            doc_search = None
         
         # CSV search tool for interview data
-        csv_search = CSVSearchTool('interview_data.csv')
+        csv_search = None
+        try:
+            csv_search = CSVSearchTool('interview_data.csv')
+            print("✅ CSV tool initialized successfully")
+        except Exception as e:
+            print(f"⚠️ CSV tool failed: {e}")
+            csv_search = None
         
         # Google search tool
-        google_search = SerperDevTool()
+        google_search = None
+        try:
+            google_search = SerperDevTool()
+            print("✅ Google search tool initialized successfully")
+        except Exception as e:
+            print(f"⚠️ Google search tool failed: {e}")
+            google_search = None
         
         return doc_search, csv_search, google_search
     except Exception as e:
@@ -150,44 +173,12 @@ def create_hr_agents():
 def create_meeting_notes(user_input):
     """Generate meeting preparation notes"""
     if not CREWAI_AVAILABLE:
-        # Try simple AI first
-        if SIMPLE_AI_AVAILABLE:
-            try:
-                return create_simple_meeting_notes(user_input)
-            except Exception as e:
-                # Fall back to template if simple AI fails
-                pass
-        
-        return f"""
-## 📋 Meeting Notes - Fallback Mode
-
-**Input:** {user_input}
-
-### Key Discussion Points:
-- Review candidate background and qualifications
-- Assess cultural fit and alignment with company values
-- Discuss role requirements and expectations
-- Evaluate technical competencies and experience
-
-### Questions to Ask:
-- Can you walk me through your experience with [relevant technology/skill]?
-- How do you handle challenging situations or conflicts?
-- What motivates you in your work?
-- Where do you see yourself in 5 years?
-
-### Action Items:
-- [ ] Review candidate resume and portfolio
-- [ ] Prepare technical assessment questions
-- [ ] Coordinate with team members for feedback
-- [ ] Schedule follow-up interview if appropriate
-
-### Policy References:
-- Employee Code of Conduct
-- Interview Guidelines and Best Practices
-- Equal Opportunity Employment Policies
-
-*Note: This is a simulated response. For AI-powered analysis, please resolve the system compatibility issues.*
-"""
+        return "CrewAI is not available. Please install required dependencies."
+    # Verify LLM configuration before attempting to call CrewAI
+    ok, llm_msg, detected = check_llm_config()
+    if not ok:
+        masked = {k: ('SET' if v else None) for k, v in detected.items()}
+        return f"LLM configuration error: {llm_msg}\n\nDetected keys (masked): {masked}"
     
     try:
         doc_search, csv_search, google_search = initialize_tools()
@@ -197,14 +188,15 @@ def create_meeting_notes(user_input):
             return "Error initializing AI components."
         
         # Create task for meeting preparation
+        available_tools = [tool for tool in [doc_search, csv_search, google_search] if tool is not None]
         meeting_task = Task(
             description=f"""
             Prepare comprehensive meeting notes based on this request: {user_input}
             
             Use the available tools to:
-            1. Search relevant company policies and documents
-            2. Look up any relevant candidate or employee information
-            3. Research any additional context needed
+            1. Search relevant company policies and documents (if available)
+            2. Look up any relevant candidate or employee information (if available)
+            3. Research any additional context needed (if available)
             
             Provide structured meeting notes with:
             - Key discussion points
@@ -212,9 +204,9 @@ def create_meeting_notes(user_input):
             - Questions to ask
             - Action items
             """,
-            expected_output="A comprehensive set of meeting notes including key discussion points, relevant policies, questions to ask, and action items formatted in a clear, structured manner.",
             agent=meeting_agent,
-            tools=[doc_search, csv_search, google_search]
+            tools=available_tools,
+            expected_output="Structured meeting notes: Key discussion points; Relevant policies; Questions to ask; Action items"
         )
         
         # Create and run crew
@@ -229,66 +221,28 @@ def create_meeting_notes(user_input):
         return str(result)
         
     except Exception as e:
-        error_str = str(e)
-        if "quota" in error_str.lower() or "rate limit" in error_str.lower() or "429" in error_str:
-            return """
-## ⚠️ API Quota Exceeded
+        # Detect common authentication errors coming from litellm/crewai
+        err_str = str(e)
+        if 'AuthenticationError' in err_str or 'api_key' in err_str or 'OPENAI_API_KEY' in err_str:
+            ok, llm_msg, detected = check_llm_config()
+            masked = {k: ('SET' if v else None) for k, v in detected.items()}
+            guidance = (
+                "Authentication/runtime error when calling LLM.\n\n"
+                "Possible fixes:\n"
+                " - If you intend to use OpenAI, set the `OPENAI_API_KEY` environment variable.\n"
+                " - If you intend to use Google Gemini, set `GEMINI_API_KEY` (or provider-specific credentials) and configure litellm to use Google.\n"
+                " - After setting the key(s), restart this Streamlit app.\n\n"
+                f"Detected keys (masked): {masked}\n\n"
+                "Original error: " + err_str
+            )
+            return guidance
 
-The Gemini AI service has reached its daily usage limit (50 requests per day for free tier).
-
-### What happened?
-- You've successfully used the AI features 50 times today
-- Google's free tier has daily limits to prevent abuse
-- The quota resets every 24 hours
-
-### Options:
-1. **Wait**: The quota will reset tomorrow and you can continue using the AI features
-2. **Use Fallback Mode**: The app provides helpful templates and guidance without AI
-3. **Upgrade**: Consider upgrading to a paid Google AI plan for higher limits
-
-### Meanwhile:
-- All other app features still work normally
-- You can review your chat history
-- Basic HR templates and guidance are available
-
-*The AI features will be available again tomorrow when the quota resets.*
-"""
-        else:
-            return f"Error generating meeting notes: {error_str}"
+        return f"Error generating meeting notes: {err_str}"
 
 def answer_faq(question):
     """Answer FAQ questions using company policies"""
     if not CREWAI_AVAILABLE:
-        # Try simple AI first
-        if SIMPLE_AI_AVAILABLE:
-            try:
-                return create_simple_faq_answer(question)
-            except Exception as e:
-                # Fall back to template if simple AI fails
-                pass
-        
-        return f"""
-## ❓ HR Policy Response - Fallback Mode
-
-**Your Question:** {question}
-
-### General HR Guidance:
-
-Based on common HR best practices, here are some general guidelines:
-
-**Common HR Topics:**
-- **Time Off:** Most companies have paid vacation, sick leave, and personal days. Check your employee handbook for specific policies.
-- **Benefits:** Typically include health insurance, retirement plans, and professional development opportunities.
-- **Code of Conduct:** Professional behavior, respect for colleagues, and adherence to company values are standard expectations.
-- **Performance Reviews:** Usually conducted annually or bi-annually to discuss goals, achievements, and development areas.
-
-### Next Steps:
-- Consult your Employee Handbook for company-specific policies
-- Contact your HR representative for detailed information
-- Review any recent policy updates or announcements
-
-*Note: This is general guidance only. For specific company policies and accurate information, please resolve the system compatibility issues to access AI-powered analysis of your company documents.*
-"""
+        return "CrewAI is not available. Please install required dependencies."
     
     try:
         doc_search, _, google_search = initialize_tools()
@@ -312,9 +266,9 @@ Based on common HR best practices, here are some general guidelines:
             - Relevant policy references if available
             - Any additional helpful context
             """,
-            expected_output="A clear, professional answer to the HR question including direct response, relevant policy references, and any additional helpful context.",
             agent=faq_agent,
-            tools=[doc_search, google_search]
+            tools=[tool for tool in [doc_search, google_search] if tool is not None],
+            expected_output="FAQ answer: Direct response with policy references when available"
         )
         
         # Create and run crew
@@ -329,68 +283,12 @@ Based on common HR best practices, here are some general guidelines:
         return str(result)
         
     except Exception as e:
-        error_str = str(e)
-        if "quota" in error_str.lower() or "rate limit" in error_str.lower() or "429" in error_str:
-            return """
-## ⚠️ API Quota Exceeded
-
-The daily AI usage limit has been reached. Please try again tomorrow or use the fallback guidance above.
-
-For immediate assistance, you can:
-- Consult your Employee Handbook
-- Contact your HR representative directly
-- Use general HR best practices as guidance
-
-*AI-powered analysis will be available again when the quota resets.*
-"""
-        else:
-            return f"Error answering question: {error_str}"
+        return f"Error answering question: {str(e)}"
 
 def generate_email(email_request):
     """Generate professional HR emails"""
     if not CREWAI_AVAILABLE:
-        # Try simple AI first
-        if SIMPLE_AI_AVAILABLE:
-            try:
-                return create_simple_email(email_request)
-            except Exception as e:
-                # Fall back to template if simple AI fails
-                pass
-        
-        return f"""
-## 📧 Professional HR Email - Fallback Mode
-
-**Request:** {email_request}
-
----
-
-**Subject:** Professional HR Communication
-
-**Email Draft:**
-
-Dear [Recipient Name],
-
-I hope this email finds you well. I am writing regarding {email_request.lower()}.
-
-[This is where the main content would be customized based on your specific request. Common HR email elements include:]
-
-- Clear and professional tone
-- Specific details and next steps
-- Contact information for follow-up
-- Relevant company policies or procedures
-
-Please don't hesitate to reach out if you have any questions or need further clarification.
-
-Best regards,
-[Your Name]
-[Your Title]
-[Company Name]
-[Contact Information]
-
----
-
-*Note: This is a template response. For AI-generated, context-aware emails tailored to your specific needs, please resolve the system compatibility issues.*
-"""
+        return "CrewAI is not available. Please install required dependencies."
     
     try:
         doc_search, csv_search, google_search = initialize_tools()
@@ -413,9 +311,9 @@ Best regards,
             
             Make sure the email follows professional HR communication standards.
             """,
-            expected_output="A complete professional HR email with subject line, greeting, body content, and closing that follows HR communication standards.",
             agent=email_agent,
-            tools=[doc_search, csv_search, google_search] if doc_search else []
+            tools=[doc_search, csv_search, google_search] if doc_search else [],
+            expected_output="Email content: subject, greeting, body, and closing"
         )
         
         # Create and run crew
@@ -430,19 +328,7 @@ Best regards,
         return str(result)
         
     except Exception as e:
-        error_str = str(e)
-        if "quota" in error_str.lower() or "rate limit" in error_str.lower() or "429" in error_str:
-            return """
-## ⚠️ API Quota Exceeded
-
-The daily AI usage limit has been reached. Please try again tomorrow or use the email template above.
-
-The template provides a professional starting point that you can customize for your specific needs.
-
-*AI-powered email generation will be available again when the quota resets.*
-"""
-        else:
-            return f"Error generating email: {error_str}"
+        return f"Error generating email: {str(e)}"
 
 def send_email(recipient, subject, body):
     """Send email using configured SMTP"""
@@ -475,33 +361,6 @@ def send_email(recipient, subject, body):
 def main():
     # Header
     st.markdown('<h1 class="main-header">🤖 EmpowerHR - AI-Powered HR Assistant</h1>', unsafe_allow_html=True)
-    
-    # Display CrewAI status
-    if not CREWAI_AVAILABLE:
-        if SIMPLE_AI_AVAILABLE:
-            st.success("🚀 **AI Status:** Powered by Google Gemini (Simple AI Mode)")
-            st.info("ℹ️ Using direct Gemini integration - ChromaDB features disabled but full AI functionality available!")
-        else:
-            st.warning("⚠️ AI features are currently limited due to a system compatibility issue.")
-       
-            if 'CREWAI_ERROR' in globals():
-                st.code(f"Error: {CREWAI_ERROR}")
-    else:
-        # Add quota status info
-        st.info("ℹ️ **AI Status:** Powered by Google Gemini (Free tier: 50 requests/day)")
-        
-    # Add general quota warning in sidebar
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📊 AI Status")
-    if CREWAI_AVAILABLE:
-        st.sidebar.success("🚀 CrewAI + Gemini")
-        st.sidebar.info("Full features available\n50 requests/day (free tier)")
-    elif SIMPLE_AI_AVAILABLE:
-        st.sidebar.success("🚀 Simple AI + Gemini")
-        st.sidebar.info("Direct Gemini integration\n50 requests/day (free tier)")
-    else:
-        st.sidebar.warning("⚠️ Template Mode")
-        st.sidebar.info("AI unavailable\nTemplate responses only")
     
     # Sidebar for navigation
     st.sidebar.title("🚀 HR Tools")
