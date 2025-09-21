@@ -1,0 +1,117 @@
+/* Global Styles */
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: #f8f9fa;
+  margin: 0;
+  padding: 0;
+  color: #333;
+}
+
+/* Container Styles */
+.container {
+  width: 90%;  /* Increase the width of the container */
+  max-width: 800px;  /* Increase the maximum width */
+  margin: 50px auto;
+  background: #ffffff;
+  padding: 20px 30px;
+  border-radius: 12px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Heading Styles */
+h1 {
+  font-size: 28px;
+  color: #007bff;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* Paragraph Styles */
+p {
+  text-align: center;
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 30px;
+}
+
+/* Form Styles */
+form {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Label Styles */
+label {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+/* Input Styles */
+input[type="text"],
+input[type="file"] {
+  padding: 12px 15px;
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+}
+
+input[type="text"]:focus,
+input[type="file"]:focus {
+  border-color: #007bff;
+  outline: none;
+}
+
+/* Button Styles */
+button {
+  padding: 12px 20px;
+  margin-top: 10px;
+  background-color: #007bff;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+button#clearButton {
+  background-color: #dc3545;
+  margin-top: 10px;
+}
+
+button#clearButton:hover {
+  background-color: #c82333;
+}
+
+/* Result Styles */
+#result {
+  margin-top: 30px;
+}
+
+textarea {
+  width: calc(100% - 40px);  /* Reduce the width to account for padding/margin */
+  height: 300px;  /* Increase the height of the textarea */
+  padding: 15px;
+  margin: 0 20px 20px 0;  /* Add right margin to create space between the border and textarea */
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  resize: vertical;
+  color: #333;
+  background-color: #f9f9f9;
+}
+
+/* Status Message Styles */
+#statusMessage {
+  font-size: 16px;
+  text-align: center;
+  margin-top: 20px;
+  color: #555;
+}

@@ -1,0 +1,19 @@
+streamlit>=1.28.0
+python-dotenv>=1.0.0
+# CrewAI and related tool versions
+crewai==0.186.1
+crewai-tools==0.73.0
+
+# Required dependencies and pinned versions to avoid conflicts
+more-itertools>=9.0.0
+onnxruntime==1.22.0
+chromadb==0.5.23
+protobuf==5.28.2
+
+langchain>=0.1.0
+langchain-google-genai>=1.0.0
+google-generativeai>=0.3.0
+pandas>=2.0.0
+numpy>=1.24.0
+requests>=2.31.0
+pysqlite3-binary==0.4.6
