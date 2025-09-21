@@ -1,3 +1,21 @@
+"""
+Shim to prefer the pysqlite3 package over the system `sqlite3` module.
+Some environments have an older system SQLite that causes runtime/version
+conflicts with packages; this forces Python to use `pysqlite3` when available.
+
+If `pysqlite3` is not installed, this will silently fall back to the bundled
+`sqlite3` module so the app still runs.
+"""
+try:
+    __import__('pysqlite3')
+    import sys
+    # Replace the stdlib sqlite3 module with pysqlite3 so imports of `sqlite3`
+    # in third-party packages use the vendored newer build.
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except Exception:
+    # pysqlite3 not available; continue using the system sqlite3 module.
+    pass
+
 import streamlit as st
 
 # Page configuration - MUST be the first Streamlit command

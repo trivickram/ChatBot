@@ -16,4 +16,6 @@ google-generativeai>=0.3.0
 pandas>=2.0.0
 numpy>=1.24.0
 requests>=2.31.0
-pysqlite3-binary==0.4.6
+# Allow pip to select a compatible pysqlite3-binary wheel for this Python
+pysqlite3-binary
+
