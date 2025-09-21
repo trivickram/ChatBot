@@ -209,7 +209,7 @@ def main():
     st.sidebar.title("🚀 HR Tools")
     selected_tool = st.sidebar.selectbox(
         "Choose an HR tool:",
-        ["🏠 Home", "📝 Meeting Notes", "❓ FAQ Assistant", "📧 Email Generator", "⚙️ System Status"]
+        ["🏠 Home", "📝 Meeting Notes", "❓ FAQ Assistant", "⚙️ System Status"]
     )
     
     # Home page
@@ -227,8 +227,11 @@ def main():
             st.write("Get instant answers to HR policy questions based on company documentation.")
             
         with col3:
-            st.markdown("### 📧 Email Generator")
-            st.write("Create professional HR emails for various scenarios and communications.")
+            # Email Generator disabled per user request
+            # TODO: To re-enable, uncomment the code below
+            # st.markdown("### 📧 Email Generator")
+            # st.write("Create professional HR emails for various scenarios and communications.")
+            st.markdown("**Email Generator: disabled by user preference.**")
         
         # Feature highlight
         st.markdown('<div class="section-header">🌟 Key Features</div>', unsafe_allow_html=True)
@@ -239,92 +242,83 @@ def main():
         - **Easy Deployment**: Ready for Streamlit Cloud deployment
         """)
     
-    # Email Generator (Main focus based on user request)
-    elif selected_tool == "📧 Email Generator":
-        st.markdown('<div class="section-header">Professional Email Generator</div>', unsafe_allow_html=True)
-        
-        st.write("Generate professional HR emails for various scenarios.")
-        
-        # Email type selection
-        email_type = st.selectbox(
-            "Select email type:",
-            [
-                "Interview Invitation",
-                "Job Offer", 
-                "Application Rejection",
-                "Policy Update",
-                "Meeting Invitation",
-                "Performance Review",
-                "Custom Request"
-            ]
-        )
-        
-        # Email details
-        email_request = st.text_area(
-            "Describe the email you need:",
-            placeholder="e.g., Send interview invitation to Sarah Johnson for Software Engineer position based on her strong technical background...",
-            height=200,
-            value="""Sarah Johnson emerges as a promising contender for the Software Engineer position,
-showcasing adeptness in Java, Python, and various development frameworks. Her
-problem-solving skills shine through, demonstrating a logical approach to tackling
-intricate coding challenges. However, there are occasional lapses in articulating
-her thoughts clearly, suggesting room for improvement in communication during
-technical discussions. Nevertheless, Sarah's eagerness for continuous learning
-and professional growth is evident, evident through her engagement in online
-courses and workshops, showcasing her adaptability to evolving industry trends.
-With further refinement in communication and a focus on providing concrete
-examples of collaboration and adaptability, Sarah holds the potential to excel in
-the role."""
-        )
-        
-        if st.button("Generate Email", type="primary"):
-            if email_request:
-                with st.spinner("Drafting your professional email..."):
-                    if CREWAI_AVAILABLE:
-                        # Use CrewAI when available (implement later)
-                        result = "CrewAI functionality coming soon..."
-                    else:
-                        # Use fallback template system
-                        result = generate_email_fallback(email_type, email_request)
-                    
-                    st.success("Email generated!")
-                    st.markdown("### 📧 Generated Email")
-                    st.code(result, language="text")
-                    
-                    # Parse subject and body for sending
-                    lines = result.split('\n')
-                    subject_line = lines[0].replace("Subject: ", "") if lines[0].startswith("Subject: ") else "HR Communication"
-                    body_lines = lines[2:] if len(lines) > 2 else lines[1:]
-                    email_body = '\n'.join(body_lines)
-                    
-                    # Send email option
-                    st.markdown("### 📤 Send Email")
-                    with st.expander("Email Sending Options"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            recipient = st.text_input("Recipient email:", placeholder="sarah.johnson@email.com")
-                        with col2:
-                            subject = st.text_input("Subject:", value=subject_line)
-                        
-                        if st.button("Send Email"):
-                            if recipient and subject:
-                                send_result = send_email(recipient, subject, email_body)
-                                if "successfully" in send_result:
-                                    st.success(send_result)
-                                else:
-                                    st.error(send_result)
-                            else:
-                                st.warning("Please provide recipient and subject.")
-                    
-                    # Download option
-                    st.download_button(
-                        label="📥 Download Email",
-                        data=result,
-                        file_name=f"hr_email_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                        mime="text/plain"
-                    )
-            else:
-                st.warning("Please describe the email you need.")
+    # Email Generator (disabled)
+    # The Email Generator feature has been temporarily disabled per user request.
+    # TODO: To re-enable, restore the block below.
+    # elif selected_tool == "📧 Email Generator":
+    #     st.markdown('<div class="section-header">Professional Email Generator</div>', unsafe_allow_html=True)
+    #     
+    #     st.write("Generate professional HR emails for various scenarios.")
+    #     
+    #     # Email type selection
+    #     email_type = st.selectbox(
+    #         "Select email type:",
+    #         [
+    #             "Interview Invitation",
+    #             "Job Offer", 
+    #             "Application Rejection",
+    #             "Policy Update",
+    #             "Meeting Invitation",
+    #             "Performance Review",
+    #             "Custom Request"
+    #         ]
+    #     )
+    #     
+    #     # Email details
+    #     email_request = st.text_area(
+    #         "Describe the email you need:",
+    #         placeholder="e.g., Send interview invitation to Sarah Johnson for Software Engineer position based on her strong technical background...",
+    #         height=200,
+    #     )
+    #     
+    #     if st.button("Generate Email", type="primary"):
+    #         if email_request:
+    #             with st.spinner("Drafting your professional email..."):
+    #                 if CREWAI_AVAILABLE:
+    #                     # Use CrewAI when available (implement later)
+    #                     result = "CrewAI functionality coming soon..."
+    #                 else:
+    #                     # Use fallback template system
+    #                     result = generate_email_fallback(email_type, email_request)
+    #                 
+    #                 st.success("Email generated!")
+    #                 st.markdown("### 📧 Generated Email")
+    #                 st.code(result, language="text")
+    #                 
+    #                 # Parse subject and body for sending
+    #                 lines = result.split('\n')
+    #                 subject_line = lines[0].replace("Subject: ", "") if lines[0].startswith("Subject: ") else "HR Communication"
+    #                 body_lines = lines[2:] if len(lines) > 2 else lines[1:]
+    #                 email_body = '\n'.join(body_lines)
+    #                 
+    #                 # Send email option
+    #                 st.markdown("### 📤 Send Email")
+    #                 with st.expander("Email Sending Options"):
+    #                     col1, col2 = st.columns(2)
+    #                     with col1:
+    #                         recipient = st.text_input("Recipient email:", placeholder="sarah.johnson@email.com")
+    #                     with col2:
+    #                         subject = st.text_input("Subject:", value=subject_line)
+    #                     
+    #                     if st.button("Send Email"):
+    #                         if recipient and subject:
+    #                             send_result = send_email(recipient, subject, email_body)
+    #                             if "successfully" in send_result:
+    #                                 st.success(send_result)
+    #                             else:
+    #                                 st.error(send_result)
+    #                         else:
+    #                             st.warning("Please provide recipient and subject.")
+    #                 
+    #                 # Download option
+    #                 st.download_button(
+    #                     label="📥 Download Email",
+    #                     data=result,
+    #                     file_name=f"hr_email_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+    #                     mime="text/plain"
+    #                 )
+    #         else:
+    #             st.warning("Please describe the email you need.")
     
     # Meeting Notes
     elif selected_tool == "📝 Meeting Notes":

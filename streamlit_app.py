@@ -113,6 +113,13 @@ st.markdown("""
 # Initialize session state
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
+# Store generated email (subject/body/raw) so Send Email works across reruns
+if 'generated_email' not in st.session_state:
+    st.session_state.generated_email = None
+if 'generated_subject' not in st.session_state:
+    st.session_state.generated_subject = None
+if 'generated_body' not in st.session_state:
+    st.session_state.generated_body = None
 
 def initialize_tools():
     """Initialize search tools for documents and data"""
@@ -331,14 +338,33 @@ def generate_email(email_request):
     except Exception as e:
         return f"Error generating email: {str(e)}"
 
-def send_email(recipient, subject, body):
-    """Send email using configured SMTP"""
+def send_email(recipient, subject, body, smtp_host='smtp.gmail.com', smtp_port=465, use_ssl=True, debug=False):
+    """Send email using configured SMTP.
+
+    Parameters:
+    - recipient, subject, body: email fields
+    - smtp_host/smtp_port/use_ssl: transport control (use localhost:1025 for debug)
+    - debug: when True, return detailed exception text for troubleshooting
+    """
     try:
+        # First try environment variables, then Streamlit secrets (for deployed apps)
         sender_email = os.getenv("EMAIL_SENDER")
         sender_password = os.getenv("EMAIL_PASSWORD")
-        
+
+        # Streamlit deploys commonly store secrets in st.secrets
+        try:
+            if (not sender_email or not sender_password) and hasattr(st, 'secrets'):
+                secrets = st.secrets
+                if not sender_email:
+                    sender_email = secrets.get('EMAIL_SENDER')
+                if not sender_password:
+                    sender_password = secrets.get('EMAIL_PASSWORD')
+        except Exception:
+            # If anything goes wrong accessing st.secrets, ignore and fall back to env
+            pass
+
         if not sender_email or not sender_password:
-            return "Email configuration missing. Please set EMAIL_SENDER and EMAIL_PASSWORD environment variables."
+            return "Email configuration missing. Please set EMAIL_SENDER and EMAIL_PASSWORD environment variables or add them to Streamlit secrets (.streamlit/secrets.toml)."
         
         # Create message
         msg = EmailMessage()
@@ -348,14 +374,29 @@ def send_email(recipient, subject, body):
         msg.set_content(body)
         
         # Send email
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-        
+        if use_ssl:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context) as server:
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.ehlo()
+                try:
+                    server.starttls(context=ssl.create_default_context())
+                except Exception:
+                    # starttls may fail on debug servers; ignore
+                    pass
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+
         return "Email sent successfully!"
-        
+
     except Exception as e:
+        if debug:
+            # Return a detailed error string for debugging in the UI
+            import traceback
+            return f"Error sending email: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
         return f"Error sending email: {str(e)}"
 
 # Main UI
@@ -367,7 +408,7 @@ def main():
     st.sidebar.title("🚀 HR Tools")
     selected_tool = st.sidebar.selectbox(
         "Choose an HR tool:",
-        ["🏠 Home", "📝 Meeting Notes", "❓ FAQ Assistant", "📧 Email Generator", "ℹ️ About"]
+        ["🏠 Home", "📝 Meeting Notes", "❓ FAQ Assistant", "ℹ️ About"]
     )
     
     # Home page
@@ -388,11 +429,15 @@ def main():
             if st.button("Ask Questions", key="faq_btn"):
                 st.sidebar.selectbox("Choose an HR tool:", ["❓ FAQ Assistant"], key="nav_faq")
         
-        with col3:
-            st.markdown("### 📧 Email Generator")
-            st.write("Create professional HR emails for various scenarios and communications.")
-            if st.button("Generate Email", key="email_btn"):
-                st.sidebar.selectbox("Choose an HR tool:", ["📧 Email Generator"], key="nav_email")
+        # with col3:
+        #     # Email Generator disabled per user request
+        #     # TODO: To re-enable the Email Generator, uncomment the lines below
+        #     # st.markdown("### 📧 Email Generator")
+        #     # st.write("Create professional HR emails for various scenarios and communications.")
+        #     # if st.button("Generate Email", key="email_btn"):
+        #     #     st.sidebar.selectbox("Choose an HR tool:", ["📧 Email Generator"], key="nav_email")
+        #     # Non-empty placeholder so the `with` block has a valid body
+        #     st.markdown("**Email Generator: disabled by user preference.**")
         
         # Recent activity
         st.markdown('<div class="section-header">Recent Activity</div>', unsafe_allow_html=True)
@@ -471,64 +516,102 @@ def main():
             else:
                 st.warning("Please ask a question.")
     
-    # Email Generator
-    elif selected_tool == "📧 Email Generator":
-        st.markdown('<div class="section-header">Professional Email Generator</div>', unsafe_allow_html=True)
-        
-        st.write("Generate professional HR emails for various scenarios.")
-        
-        # Email type selection
-        email_type = st.selectbox(
-            "Select email type:",
-            [
-                "Job Offer",
-                "Interview Invitation",
-                "Application Rejection",
-                "Policy Update",
-                "Meeting Invitation",
-                "Performance Review",
-                "Custom Request"
-            ]
-        )
-        
-        # Email details
-        email_request = st.text_area(
-            "Describe the email you need:",
-            placeholder="e.g., Send a job offer to Sarah Johnson for Marketing Manager position with salary $75,000, start date January 15th",
-            height=100
-        )
-        
-        if st.button("Generate Email", type="primary"):
-            if email_request:
-                with st.spinner("Drafting your professional email..."):
-                    full_request = f"Create a {email_type} email: {email_request}"
-                    result = generate_email(full_request)
-                    st.success("Email generated!")
-                    st.markdown("### 📧 Generated Email")
-                    st.code(result, language="text")
-                    
-                    # Save to history
-                    st.session_state.chat_history.append(("Email", email_request, result))
-                    
-                    # Send email option
-                    st.markdown("### 📤 Send Email")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        recipient = st.text_input("Recipient email:", placeholder="recipient@company.com")
-                    with col2:
-                        subject = st.text_input("Subject:", placeholder="Job Offer - Marketing Manager Position")
-                    
-                    if st.button("Send Email"):
-                        if recipient and subject:
-                            send_result = send_email(recipient, subject, result)
-                            if "successfully" in send_result:
-                                st.success(send_result)
-                            else:
-                                st.error(send_result)
-                        else:
-                            st.warning("Please provide recipient and subject.")
-            else:
-                st.warning("Please describe the email you need.")
+    # Email Generator (disabled)
+    # The Email Generator feature has been temporarily disabled per user request.
+    # TODO: To re-enable, restore the block below and the `generate_email` function.
+    # elif selected_tool == "📧 Email Generator":
+    #     st.markdown('<div class="section-header">Professional Email Generator</div>', unsafe_allow_html=True)
+    #     
+    #     st.write("Generate professional HR emails for various scenarios.")
+    #     
+    #     # Email type selection
+    #     email_type = st.selectbox(
+    #         "Select email type:",
+    #         [
+    #             "Job Offer",
+    #             "Interview Invitation",
+    #             "Application Rejection",
+    #             "Policy Update",
+    #             "Meeting Invitation",
+    #             "Performance Review",
+    #             "Custom Request"
+    #         ]
+    #     )
+    #     
+    #     # Email details
+    #     email_request = st.text_area(
+    #         "Describe the email you need:",
+    #         placeholder="e.g., Send a job offer to Sarah Johnson for Marketing Manager position with salary $75,000, start date January 15th",
+    #         height=100
+    #     )
+    #     
+    #     if st.button("Generate Email", type="primary"):
+    #         if email_request:
+    #             with st.spinner("Drafting your professional email..."):
+    #                 full_request = f"Create a {email_type} email: {email_request}"
+    #                 result = generate_email(full_request)
+    #                 st.success("Email generated!")
+    #                 st.markdown("### 📧 Generated Email")
+    #                 st.code(result, language="text")
+    #                 
+    #                 # Save to history
+    #                 st.session_state.chat_history.append(("Email", email_request, result))
+    #                 # Parse subject and body so we can persist them across Streamlit reruns
+    #                 lines = result.split('\n')
+    #                 parsed_subject = None
+    #                 parsed_body = result
+    #                 if len(lines) > 0 and lines[0].lower().startswith('subject:'):
+    #                     parsed_subject = lines[0].split(':', 1)[1].strip()
+    #                     # Remove subject line and possible blank line after it
+    #                     body_lines = lines[1:]
+    #                     if len(body_lines) > 0 and body_lines[0].strip() == '':
+    #                         body_lines = body_lines[1:]
+    #                     parsed_body = '\n'.join(body_lines)
+
+    #                 # Persist generated email in session state so Send Email works reliably
+    #                 st.session_state.generated_email = result
+    #                 st.session_state.generated_subject = parsed_subject or "HR Communication"
+    #                 st.session_state.generated_body = parsed_body
+
+    #                 # Send email option (uses persisted session_state values)
+    #                 st.markdown("### 📤 Send Email")
+    #                 col1, col2 = st.columns(2)
+    #                 with col1:
+    #                     recipient = st.text_input("Recipient email:", placeholder="recipient@company.com")
+    #                 with col2:
+    #                     subject = st.text_input("Subject:", value=st.session_state.generated_subject)
+
+    #                 if st.button("Send Email"):
+    #                     if recipient and subject:
+    #                         body_to_send = st.session_state.generated_body or result
+    #                         send_result = send_email(recipient, subject, body_to_send)
+    #                         if "successfully" in send_result:
+    #                             st.success(send_result)
+    #                         else:
+    #                             st.error(send_result)
+    #                     else:
+    #                         st.warning("Please provide recipient and subject.")
+
+    #                 # Debug / Test sending options
+    #                 with st.expander("Debug / Test Sending"):
+    #                     use_local_smtp = st.checkbox("Use local SMTP debugging server (localhost:1025)", value=False)
+    #                     if st.button("Send Email (Debug)"):
+    #                         if recipient and subject:
+    #                             if use_local_smtp:
+    #                                 # When using a local SMTP debug server, credentials aren't needed
+    #                                 debug_result = send_email(recipient, subject, body_to_send, smtp_host='localhost', smtp_port=1025, use_ssl=False, debug=True)
+    #                             else:
+    #                                 debug_result = send_email(recipient, subject, body_to_send, debug=True)
+
+    #                             # Show detailed debug result
+    #                             if debug_result and debug_result.startswith('Error'):
+    #                                 st.error(debug_result)
+    #                             else:
+    #                                 st.success(debug_result)
+    #                         else:
+    #                             st.warning("Please provide recipient and subject.")
+    #         else:
+    #             st.warning("Please describe the email you need.")
     
     # About page
     elif selected_tool == "ℹ️ About":
