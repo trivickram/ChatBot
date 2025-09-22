@@ -34,3 +34,4 @@ sqlparse
 stack-data
 traitlets
 wcwidth
+pysqlite3-binary
