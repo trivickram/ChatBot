@@ -17,5 +17,5 @@ pandas>=2.0.0
 numpy>=1.24.0
 requests>=2.31.0
 # Allow pip to select a compatible pysqlite3-binary wheel for this Python
-# pysqlite3-binary
+pysqlite3-binary
 
