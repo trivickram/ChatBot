@@ -1,1 +1,15 @@
-".streamlit/secrets.toml"
+# Environment variables and secrets
+# Ignores any .env or .secrets.toml file anywhere in the project
+*.env
+secrets.toml
+
+# Django specific files
+# Ignores the local development database
+*.sqlite3
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Virtual environment folder
+/venv/
